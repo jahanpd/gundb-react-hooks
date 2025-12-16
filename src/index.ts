@@ -74,6 +74,8 @@ export type AuthContextType = {
   appKeys: undefined | string | KeyPair;
   isLoggedIn: boolean;
   newGunInstance: (opts?: GunOptions) => IGunChainReference;
+  restartGun: () => void;
+  gunInstanceKey: number;
 };
 
 export type AuthProviderOpts = {
@@ -1282,6 +1284,8 @@ export const AuthProvider: React.FC<AuthProviderOpts> = ({
     keyStatus: '',
   });
 
+  const [gunInstanceKey, setGunInstanceKey] = useState(0);
+
   const gun = useGun(Gun, gunOpts);
   const newKeys = useGunKeys(sea);
   const [user, isLoggedIn] = useGunKeyAuth(
@@ -1382,6 +1386,22 @@ export const AuthProvider: React.FC<AuthProviderOpts> = ({
     [Gun, gunOpts],
   );
 
+  const restartGun = useCallback(() => {
+    // 1) hard cleanup old instance (best-effort)
+    try {
+      // important: stop listeners/timers
+      (gun as any)?.off?.();
+    } catch {}
+    try {
+      // logout user session if present
+      if (user?.leave) user.leave();
+    } catch {}
+
+    // 2) remount the subtree
+    setGunInstanceKey((k) => k + 1);
+    // after remount, your existing "get keys from storage" + auth effects run again
+  }, [gun, user]);
+
   const value = useMemo<AuthContextType>(
     () => ({
       gun,
@@ -1392,6 +1412,8 @@ export const AuthProvider: React.FC<AuthProviderOpts> = ({
       appKeys: existingKeys || newKeys,
       isLoggedIn,
       newGunInstance,
+      restartGun,
+      gunInstanceKey
     }),
     [
       gun,
@@ -1403,6 +1425,8 @@ export const AuthProvider: React.FC<AuthProviderOpts> = ({
       existingKeys,
       isLoggedIn,
       newGunInstance,
+      restartGun,
+      gunInstanceKey
     ],
   );
 
